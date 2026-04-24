@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Portal Gun FPS</title>
+<title>Portal FPS FINAL</title>
 <style>
   body { margin:0; overflow:hidden; }
 </style>
@@ -39,7 +39,6 @@ ground.rotation.x = -Math.PI/2;
 scene.add(ground);
 
 // ===== BUILDINGS =====
-const buildings=[];
 for(let i=0;i<80;i++){
   let h = Math.random()*10 + 5;
 
@@ -55,7 +54,6 @@ for(let i=0;i<80;i++){
   );
 
   scene.add(b);
-  buildings.push(b);
 }
 
 // ===== PLAYER =====
@@ -76,6 +74,10 @@ addEventListener("mousemove", e=>{
   }
 });
 
+// ===== DIRECTION VECTORS =====
+const direction = new THREE.Vector3();
+const right = new THREE.Vector3();
+
 // ===== PORTALS =====
 let portalA=null;
 let portalB=null;
@@ -90,7 +92,6 @@ function makePortal(color){
   return p;
 }
 
-// ===== SHOOT PORTAL (LEFT CLICK ONLY) =====
 addEventListener("mousedown", e=>{
   if(e.button!==0) return;
 
@@ -111,7 +112,7 @@ addEventListener("mousedown", e=>{
   }
 });
 
-// ===== PORTAL GUN (VISIBLE) =====
+// ===== GUN =====
 const gun = new THREE.Mesh(
   new THREE.BoxGeometry(0.3,0.3,1),
   new THREE.MeshBasicMaterial({color:0xffffff})
@@ -139,43 +140,46 @@ function teleport(){
 function animate(){
   requestAnimationFrame(animate);
 
+  // update camera direction
+  camera.rotation.set(0, -yaw, 0);
+  camera.getWorldDirection(direction);
+  direction.y = 0;
+  direction.normalize();
+
+  right.crossVectors(direction, new THREE.Vector3(0,1,0)).normalize();
+
   let speed = 0.2;
 
   if(keys["w"]){
-    x += Math.sin(yaw) * speed;
-    z += Math.cos(yaw) * speed;
+    x += direction.x * speed;
+    z += direction.z * speed;
   }
   if(keys["s"]){
-    x -= Math.sin(yaw) * speed;
-    z -= Math.cos(yaw) * speed;
+    x -= direction.x * speed;
+    z -= direction.z * speed;
   }
   if(keys["a"]){
-    x += Math.sin(yaw + Math.PI/2) * speed;
-    z += Math.cos(yaw + Math.PI/2) * speed;
+    x -= right.x * speed;
+    z -= right.z * speed;
   }
   if(keys["d"]){
-    x += Math.sin(yaw - Math.PI/2) * speed;
-    z += Math.cos(yaw - Math.PI/2) * speed;
+    x += right.x * speed;
+    z += right.z * speed;
   }
 
   teleport();
 
-  // camera
-  camera.position.set(x, y, z);
-  camera.lookAt(
-    x + Math.sin(yaw),
-    y,
-    z + Math.cos(yaw)
-  );
+  // camera position
+  camera.position.set(x,y,z);
 
-  // ===== GUN POSITION (BOTTOM RIGHT) =====
-  gun.position.set(
-    x + Math.sin(yaw)*1 + Math.sin(yaw - Math.PI/2)*0.5,
-    y - 0.5,
-    z + Math.cos(yaw)*1 + Math.cos(yaw - Math.PI/2)*0.5
-  );
+  // ===== GUN LOCKED TO CAMERA =====
+  gun.position.copy(camera.position);
 
-  gun.rotation.y = -yaw;
+  gun.position.add(direction.clone().multiplyScalar(0.8));
+  gun.position.add(right.clone().multiplyScalar(0.4));
+  gun.position.y -= 0.5;
+
+  gun.rotation.copy(camera.rotation);
 
   renderer.render(scene, camera);
 }
