@@ -34,7 +34,7 @@ function resize(){
   canvas.width = innerWidth;
   canvas.height = innerHeight;
 }
-onresize = resize;
+window.onresize = resize;
 resize();
 
 // player
@@ -56,18 +56,18 @@ for(let i=0;i<60;i++){
 
 // controls
 let keys={};
-onkeydown=e=>keys[e.key.toLowerCase()]=true;
-onkeyup=e=>keys[e.key.toLowerCase()]=false;
+window.onkeydown=e=>keys[e.key.toLowerCase()]=true;
+window.onkeyup=e=>keys[e.key.toLowerCase()]=false;
 
-onclick=()=>canvas.requestPointerLock();
+canvas.onclick=()=>canvas.requestPointerLock();
 
-onmousemove=e=>{
+window.onmousemove=e=>{
   if(document.pointerLockElement===canvas){
     player.yaw -= e.movementX*0.002;
   }
 };
 
-onmousedown=e=>{
+window.onmousedown=e=>{
   let dx=Math.sin(player.yaw);
   let dz=Math.cos(player.yaw);
 
@@ -80,7 +80,7 @@ onmousedown=e=>{
   if(e.button===2) B=hit;
 };
 
-oncontextmenu=e=>e.preventDefault();
+window.oncontextmenu=e=>e.preventDefault();
 
 // teleport
 function teleport(){
@@ -142,7 +142,6 @@ function loop(){
   ctx.fillStyle="black";
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  // draw buildings
   let list=[];
   for(let b of buildings){
     let p=proj(b.x,b.z);
@@ -162,7 +161,6 @@ function loop(){
     ctx.fillRect(p.x-w/2,p.y-h,w,h);
   }
 
-  // portals
   function draw(p,color){
     if(!p) return;
     let pr=proj(p.x,p.z);
