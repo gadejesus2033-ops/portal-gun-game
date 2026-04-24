@@ -2,135 +2,162 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Portal Game</title>
+<title>Portal Game Fixed</title>
+<style>
+  body { margin:0; overflow:hidden; background:black; }
+</style>
 </head>
-<body style="margin:0;overflow:hidden;background:black;">
+<body>
 
-<canvas id="c"></canvas>
+<canvas id="game"></canvas>
 
 <script>
-const c = document.getElementById("c");
+const c = document.getElementById("game");
 const ctx = c.getContext("2d");
 
 function resize(){
-  c.width = window.innerWidth;
-  c.height = window.innerHeight;
+  c.width = innerWidth;
+  c.height = innerHeight;
 }
-window.addEventListener("resize", resize);
+addEventListener("resize", resize);
 resize();
 
-// player
-let x=0, z=0, yaw=0;
+// ===== PLAYER =====
+let x=0, z=0, angle=0, speed=0;
 
-// portals
-let A=null, B=null;
+// ===== PORTALS =====
+let portalA=null;
+let portalB=null;
 
-// controls
+// ===== CONTROLS =====
 let keys={};
-window.addEventListener("keydown", e=>keys[e.key.toLowerCase()]=true);
-window.addEventListener("keyup", e=>keys[e.key.toLowerCase()]=false);
 
-c.addEventListener("click", ()=>c.requestPointerLock());
+onkeydown=e=>keys[e.key.toLowerCase()]=true;
+onkeyup=e=>keys[e.key.toLowerCase()]=false;
 
-window.addEventListener("mousemove", e=>{
+c.onclick=()=>c.requestPointerLock();
+
+onmousemove=e=>{
   if(document.pointerLockElement===c){
-    yaw -= e.movementX*0.002;
+    angle -= e.movementX * 0.002;
   }
-});
+};
 
-window.addEventListener("mousedown", e=>{
-  let dx=Math.sin(yaw);
-  let dz=Math.cos(yaw);
+onmousedown=e=>{
+  let dx=Math.sin(angle);
+  let dz=Math.cos(angle);
 
-  let hit={x:x+dx*10, z:z+dz*10};
+  let hit={
+    x:x + dx*12,
+    z:z + dz*12
+  };
 
-  if(e.button===0) A=hit;
-  if(e.button===2) B=hit;
-});
+  if(e.button===0) portalA=hit;
+  if(e.button===2) portalB=hit;
+};
 
-window.addEventListener("contextmenu", e=>e.preventDefault());
+oncontextmenu=e=>e.preventDefault();
 
-// teleport
-function tp(){
-  if(!A||!B) return;
-
-  let dA=Math.hypot(x-A.x,z-A.z);
-  let dB=Math.hypot(x-B.x,z-B.z);
-
-  if(dA<1){ x=B.x; z=B.z; }
-  else if(dB<1){ x=A.x; z=A.z; }
+// ===== WORLD =====
+let buildings=[];
+for(let i=0;i<60;i++){
+  buildings.push({
+    x:(Math.random()-0.5)*80,
+    z:(Math.random()-0.5)*80,
+    w:3,
+    h:Math.random()*10+5
+  });
 }
 
-// projection
+// ===== PROJECTION =====
 function proj(px,pz){
   let dx=px-x;
   let dz=pz-z;
 
-  let cos=Math.cos(yaw);
-  let sin=Math.sin(yaw);
+  let cos=Math.cos(angle);
+  let sin=Math.sin(angle);
 
   let rx=dx*cos-dz*sin;
   let rz=dx*sin+dz*cos;
 
   let s=300/(rz+10);
 
-  return {x:c.width/2+rx*s, y:c.height/2, s:s, d:rz};
+  return {
+    x:c.width/2 + rx*s,
+    y:c.height/2,
+    s:s,
+    d:rz
+  };
 }
 
-// buildings
-let b=[];
-for(let i=0;i<40;i++){
-  b.push({
-    x:(Math.random()-0.5)*60,
-    z:(Math.random()-0.5)*60,
-    w:2+Math.random()*4,
-    h:5+Math.random()*10
-  });
+// ===== TELEPORT =====
+function teleport(){
+  if(!portalA || !portalB) return;
+
+  let dA=Math.hypot(x-portalA.x, z-portalA.z);
+  let dB=Math.hypot(x-portalB.x, z-portalB.z);
+
+  if(dA < 1){
+    x = portalB.x;
+    z = portalB.z;
+    speed = 0;
+  }
+  else if(dB < 1){
+    x = portalA.x;
+    z = portalA.z;
+    speed = 0;
+  }
 }
 
-// loop
+// ===== LOOP =====
 function loop(){
   requestAnimationFrame(loop);
 
-  let speed=0.1;
+  // movement (same feel as your car game)
+  if(keys["w"]) speed += 0.02;
+  if(keys["s"]) speed -= 0.02;
+  speed *= 0.9;
 
-  if(keys["w"]){ x+=Math.sin(yaw)*speed; z+=Math.cos(yaw)*speed; }
-  if(keys["s"]){ x-=Math.sin(yaw)*speed; z-=Math.cos(yaw)*speed; }
-  if(keys["a"]) yaw+=0.05;
-  if(keys["d"]) yaw-=0.05;
+  if(keys["a"]) angle += 0.04;
+  if(keys["d"]) angle -= 0.04;
 
-  tp();
+  x += Math.sin(angle) * speed * 2;
+  z += Math.cos(angle) * speed * 2;
 
+  teleport();
+
+  // draw
   ctx.fillStyle="black";
   ctx.fillRect(0,0,c.width,c.height);
 
   let list=[];
-  for(let o of b){
-    let p=proj(o.x,o.z);
-    list.push({o,p});
-  }
+  buildings.forEach(b=>{
+    let p=proj(b.x,b.z);
+    list.push({b,p});
+  });
 
   list.sort((a,b)=>b.p.d-a.p.d);
 
-  for(let e of list){
-    let w=e.o.w*e.p.s;
-    let h=e.o.h*e.p.s;
+  list.forEach(e=>{
+    let w=e.b.w * e.p.s;
+    let h=e.b.h * e.p.s;
 
     ctx.fillStyle="#888";
-    ctx.fillRect(e.p.x-w/2,e.p.y-h,w,h);
-  }
+    ctx.fillRect(e.p.x - w/2, e.p.y - h, w, h);
+  });
 
-  function draw(p,color){
+  function drawPortal(p,color){
     if(!p) return;
     let pr=proj(p.x,p.z);
+
     ctx.fillStyle=color;
     ctx.beginPath();
-    ctx.arc(pr.x,pr.y,20*pr.s,0,Math.PI*2);
+    ctx.arc(pr.x, pr.y, 25*pr.s, 0, Math.PI*2);
     ctx.fill();
   }
 
-  draw(A,"blue");
-  draw(B,"orange");
+  drawPortal(portalA,"blue");
+  drawPortal(portalB,"orange");
 }
 
 loop();
