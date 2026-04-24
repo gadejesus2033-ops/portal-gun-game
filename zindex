@@ -1,16 +1,29 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
   <title>3D Portal City</title>
   <style>
     body { margin: 0; overflow: hidden; }
     canvas { display: block; }
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-family: Arial;
+      background: rgba(0,0,0,0.5);
+      padding: 10px;
+      border-radius: 8px;
+    }
   </style>
 </head>
 <body>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script>
-// Scene setup
+<div id="info">Click to start<br>WASD = Move<br>Mouse = Look<br>Left Click = Blue Portal<br>Right Click = Orange Portal</div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.128/build/three.module.js';
+
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
 
@@ -19,19 +32,17 @@ const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// Player
 const player = new THREE.Object3D();
 player.position.set(0, 2, 5);
 scene.add(player);
-camera.position.set(0, 2, 0);
+
+camera.position.set(0, 0, 0);
 player.add(camera);
 
-// Light
 const light = new THREE.DirectionalLight(0xffffff, 1);
 light.position.set(10, 20, 10);
 scene.add(light);
 
-// Ground
 const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(200, 200),
   new THREE.MeshStandardMaterial({ color: 0x555555 })
@@ -41,26 +52,26 @@ scene.add(ground);
 
 // Buildings
 for (let i = 0; i < 50; i++) {
+  const height = Math.random()*20+5;
   const b = new THREE.Mesh(
-    new THREE.BoxGeometry(5, Math.random()*20+5, 5),
+    new THREE.BoxGeometry(5, height, 5),
     new THREE.MeshStandardMaterial({ color: 0x888888 })
   );
   b.position.set(
     (Math.random() - 0.5) * 100,
-    b.geometry.parameters.height / 2,
+    height/2,
     (Math.random() - 0.5) * 100
   );
   scene.add(b);
 }
 
-// Movement
+// Controls
 const keys = {};
 document.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
 document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
-// Mouse look
 let yaw = 0, pitch = 0;
-document.body.requestPointerLock = document.body.requestPointerLock || document.body.mozRequestPointerLock;
+
 document.body.onclick = () => document.body.requestPointerLock();
 
 document.addEventListener('mousemove', e => {
@@ -79,7 +90,7 @@ const raycaster = new THREE.Raycaster();
 
 function shootPortal(color) {
   raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
-  const hits = raycaster.intersectObjects(scene.children);
+  const hits = raycaster.intersectObjects(scene.children, false);
 
   if (hits.length > 0) {
     const hit = hits[0];
@@ -109,25 +120,21 @@ window.addEventListener('mousedown', e => {
   if (e.button === 2) shootPortal(0xff8800);
 });
 
-// Teleport
+window.addEventListener('contextmenu', e => e.preventDefault());
+
 function checkTeleport() {
   if (!portalA || !portalB) return;
 
   const distA = player.position.distanceTo(portalA.position);
   const distB = player.position.distanceTo(portalB.position);
 
-  if (distA < 1.5) {
-    player.position.copy(portalB.position);
-  } else if (distB < 1.5) {
-    player.position.copy(portalA.position);
-  }
+  if (distA < 1.5) player.position.copy(portalB.position);
+  else if (distB < 1.5) player.position.copy(portalA.position);
 }
 
-// Game loop
 function animate() {
   requestAnimationFrame(animate);
 
-  // Movement
   const speed = 0.2;
   const dir = new THREE.Vector3();
 
@@ -144,7 +151,6 @@ function animate() {
   player.position.add(forward.multiplyScalar(dir.z * speed));
   player.position.add(right.multiplyScalar(dir.x * speed));
 
-  // Camera rotation
   player.rotation.y = yaw;
   camera.rotation.x = pitch;
 
@@ -154,6 +160,12 @@ function animate() {
 }
 
 animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
 </script>
 </body>
 </html>
