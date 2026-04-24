@@ -16,7 +16,7 @@ function resize(){
   c.width = window.innerWidth;
   c.height = window.innerHeight;
 }
-window.onresize = resize;
+window.addEventListener("resize", resize);
 resize();
 
 // player
@@ -27,18 +27,18 @@ let A=null, B=null;
 
 // controls
 let keys={};
-window.onkeydown=e=>keys[e.key.toLowerCase()]=true;
-window.onkeyup=e=>keys[e.key.toLowerCase()]=false;
+window.addEventListener("keydown", e=>keys[e.key.toLowerCase()]=true);
+window.addEventListener("keyup", e=>keys[e.key.toLowerCase()]=false);
 
-c.onclick=()=>c.requestPointerLock();
+c.addEventListener("click", ()=>c.requestPointerLock());
 
-window.onmousemove=e=>{
+window.addEventListener("mousemove", e=>{
   if(document.pointerLockElement===c){
     yaw -= e.movementX*0.002;
   }
-};
+});
 
-window.onmousedown=e=>{
+window.addEventListener("mousedown", e=>{
   let dx=Math.sin(yaw);
   let dz=Math.cos(yaw);
 
@@ -46,9 +46,9 @@ window.onmousedown=e=>{
 
   if(e.button===0) A=hit;
   if(e.button===2) B=hit;
-};
+});
 
-window.oncontextmenu=e=>e.preventDefault();
+window.addEventListener("contextmenu", e=>e.preventDefault());
 
 // teleport
 function tp(){
