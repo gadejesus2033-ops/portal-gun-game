@@ -2,79 +2,47 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Portal City</title>
-<style>
-body { margin:0; overflow:hidden; background:black; }
-#info {
-  position:absolute;
-  top:10px;
-  left:10px;
-  color:white;
-  font-family:Arial;
-}
-</style>
+<title>Portal Game</title>
 </head>
-<body>
-
-<div id="info">
-Click to lock mouse<br>
-WASD = Move<br>
-Mouse = Look<br>
-Left Click = Blue Portal<br>
-Right Click = Orange Portal
-</div>
+<body style="margin:0;overflow:hidden;background:black;">
 
 <canvas id="c"></canvas>
 
 <script>
-const canvas = document.getElementById("c");
-const ctx = canvas.getContext("2d");
+const c = document.getElementById("c");
+const ctx = c.getContext("2d");
 
 function resize(){
-  canvas.width = innerWidth;
-  canvas.height = innerHeight;
+  c.width = window.innerWidth;
+  c.height = window.innerHeight;
 }
 window.onresize = resize;
 resize();
 
 // player
-let player = {x:0,z:0,yaw:0};
+let x=0, z=0, yaw=0;
 
 // portals
 let A=null, B=null;
-
-// world
-let buildings=[];
-for(let i=0;i<60;i++){
-  buildings.push({
-    x:(Math.random()-0.5)*80,
-    z:(Math.random()-0.5)*80,
-    size:2+Math.random()*4,
-    h:5+Math.random()*15
-  });
-}
 
 // controls
 let keys={};
 window.onkeydown=e=>keys[e.key.toLowerCase()]=true;
 window.onkeyup=e=>keys[e.key.toLowerCase()]=false;
 
-canvas.onclick=()=>canvas.requestPointerLock();
+c.onclick=()=>c.requestPointerLock();
 
 window.onmousemove=e=>{
-  if(document.pointerLockElement===canvas){
-    player.yaw -= e.movementX*0.002;
+  if(document.pointerLockElement===c){
+    yaw -= e.movementX*0.002;
   }
 };
 
 window.onmousedown=e=>{
-  let dx=Math.sin(player.yaw);
-  let dz=Math.cos(player.yaw);
+  let dx=Math.sin(yaw);
+  let dz=Math.cos(yaw);
 
-  let hit={
-    x:player.x+dx*10,
-    z:player.z+dz*10
-  };
+  let hit={x:x+dx*10, z:z+dz*10};
 
   if(e.button===0) A=hit;
   if(e.button===2) B=hit;
@@ -83,40 +51,41 @@ window.onmousedown=e=>{
 window.oncontextmenu=e=>e.preventDefault();
 
 // teleport
-function teleport(){
+function tp(){
   if(!A||!B) return;
 
-  let dA=Math.hypot(player.x-A.x,player.z-A.z);
-  let dB=Math.hypot(player.x-B.x,player.z-B.z);
+  let dA=Math.hypot(x-A.x,z-A.z);
+  let dB=Math.hypot(x-B.x,z-B.z);
 
-  if(dA<1){
-    player.x=B.x;
-    player.z=B.z;
-  } else if(dB<1){
-    player.x=A.x;
-    player.z=A.z;
-  }
+  if(dA<1){ x=B.x; z=B.z; }
+  else if(dB<1){ x=A.x; z=A.z; }
 }
 
 // projection
-function proj(x,z){
-  let dx=x-player.x;
-  let dz=z-player.z;
+function proj(px,pz){
+  let dx=px-x;
+  let dz=pz-z;
 
-  let cos=Math.cos(player.yaw);
-  let sin=Math.sin(player.yaw);
+  let cos=Math.cos(yaw);
+  let sin=Math.sin(yaw);
 
   let rx=dx*cos-dz*sin;
   let rz=dx*sin+dz*cos;
 
   let s=300/(rz+10);
 
-  return {
-    x:canvas.width/2+rx*s,
-    y:canvas.height/2,
-    s:s,
-    d:rz
-  };
+  return {x:c.width/2+rx*s, y:c.height/2, s:s, d:rz};
+}
+
+// buildings
+let b=[];
+for(let i=0;i<40;i++){
+  b.push({
+    x:(Math.random()-0.5)*60,
+    z:(Math.random()-0.5)*60,
+    w:2+Math.random()*4,
+    h:5+Math.random()*10
+  });
 }
 
 // loop
@@ -125,40 +94,30 @@ function loop(){
 
   let speed=0.1;
 
-  if(keys["w"]){
-    player.x+=Math.sin(player.yaw)*speed;
-    player.z+=Math.cos(player.yaw)*speed;
-  }
-  if(keys["s"]){
-    player.x-=Math.sin(player.yaw)*speed;
-    player.z-=Math.cos(player.yaw)*speed;
-  }
+  if(keys["w"]){ x+=Math.sin(yaw)*speed; z+=Math.cos(yaw)*speed; }
+  if(keys["s"]){ x-=Math.sin(yaw)*speed; z-=Math.cos(yaw)*speed; }
+  if(keys["a"]) yaw+=0.05;
+  if(keys["d"]) yaw-=0.05;
 
-  if(keys["a"]) player.yaw+=0.05;
-  if(keys["d"]) player.yaw-=0.05;
-
-  teleport();
+  tp();
 
   ctx.fillStyle="black";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillRect(0,0,c.width,c.height);
 
   let list=[];
-  for(let b of buildings){
-    let p=proj(b.x,b.z);
-    list.push({b,p});
+  for(let o of b){
+    let p=proj(o.x,o.z);
+    list.push({o,p});
   }
 
   list.sort((a,b)=>b.p.d-a.p.d);
 
-  for(let o of list){
-    let b=o.b;
-    let p=o.p;
-
-    let w=b.size*p.s;
-    let h=b.h*p.s;
+  for(let e of list){
+    let w=e.o.w*e.p.s;
+    let h=e.o.h*e.p.s;
 
     ctx.fillStyle="#888";
-    ctx.fillRect(p.x-w/2,p.y-h,w,h);
+    ctx.fillRect(e.p.x-w/2,e.p.y-h,w,h);
   }
 
   function draw(p,color){
@@ -166,7 +125,7 @@ function loop(){
     let pr=proj(p.x,p.z);
     ctx.fillStyle=color;
     ctx.beginPath();
-    ctx.arc(pr.x, pr.y, 20*pr.s, 0, Math.PI*2);
+    ctx.arc(pr.x,pr.y,20*pr.s,0,Math.PI*2);
     ctx.fill();
   }
 
