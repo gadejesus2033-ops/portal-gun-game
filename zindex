@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
   <meta charset="UTF-8">
   <title>3D Portal City</title>
@@ -21,9 +21,8 @@
 <body>
 <div id="info">Click to start<br>WASD = Move<br>Mouse = Look<br>Left Click = Blue Portal<br>Right Click = Orange Portal</div>
 
-<script type="module">
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.128/build/three.module.js';
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
 
@@ -35,8 +34,6 @@ document.body.appendChild(renderer.domElement);
 const player = new THREE.Object3D();
 player.position.set(0, 2, 5);
 scene.add(player);
-
-camera.position.set(0, 0, 0);
 player.add(camera);
 
 const light = new THREE.DirectionalLight(0xffffff, 1);
@@ -50,7 +47,6 @@ const ground = new THREE.Mesh(
 ground.rotation.x = -Math.PI / 2;
 scene.add(ground);
 
-// Buildings
 for (let i = 0; i < 50; i++) {
   const height = Math.random()*20+5;
   const b = new THREE.Mesh(
@@ -65,7 +61,6 @@ for (let i = 0; i < 50; i++) {
   scene.add(b);
 }
 
-// Controls
 const keys = {};
 document.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
 document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
@@ -82,7 +77,6 @@ document.addEventListener('mousemove', e => {
   }
 });
 
-// Portals
 let portalA = null;
 let portalB = null;
 
@@ -90,7 +84,7 @@ const raycaster = new THREE.Raycaster();
 
 function shootPortal(color) {
   raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
-  const hits = raycaster.intersectObjects(scene.children, false);
+  const hits = raycaster.intersectObjects(scene.children);
 
   if (hits.length > 0) {
     const hit = hits[0];
