@@ -2,25 +2,32 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Portal City Game</title>
+<title>Portal City</title>
 <style>
-body { margin:0; overflow:hidden; background:#111; color:white; font-family:Arial;}
-#info {position:absolute; top:10px; left:10px;}
+body { margin:0; overflow:hidden; background:black; }
+#info {
+  position:absolute;
+  top:10px;
+  left:10px;
+  color:white;
+  font-family:Arial;
+}
 </style>
 </head>
 <body>
 
 <div id="info">
-Click to start<br>
-WASD move | Space jump<br>
-Mouse look<br>
-Left = Blue Portal | Right = Orange
+Click to lock mouse<br>
+WASD = Move<br>
+Mouse = Look<br>
+Left Click = Blue Portal<br>
+Right Click = Orange Portal
 </div>
 
-<canvas id="game"></canvas>
+<canvas id="c"></canvas>
 
 <script>
-const canvas = document.getElementById("game");
+const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 
 function resize(){
@@ -30,30 +37,24 @@ function resize(){
 onresize = resize;
 resize();
 
-// PLAYER
-let player = {
-  x:0, y:1, z:0,
-  vx:0, vy:0, vz:0,
-  yaw:0, pitch:0,
-  onGround:false
-};
+// player
+let player = {x:0,z:0,yaw:0};
 
-// WORLD
-let cubes = [];
-for(let i=0;i<80;i++){
-  cubes.push({
+// portals
+let A=null, B=null;
+
+// world
+let buildings=[];
+for(let i=0;i<60;i++){
+  buildings.push({
     x:(Math.random()-0.5)*80,
     z:(Math.random()-0.5)*80,
-    size:2+Math.random()*5,
-    h:3+Math.random()*10
+    size:2+Math.random()*4,
+    h:5+Math.random()*15
   });
 }
 
-// PORTALS
-let portalA=null;
-let portalB=null;
-
-// INPUT
+// controls
 let keys={};
 onkeydown=e=>keys[e.key.toLowerCase()]=true;
 onkeyup=e=>keys[e.key.toLowerCase()]=false;
@@ -63,148 +64,116 @@ onclick=()=>canvas.requestPointerLock();
 onmousemove=e=>{
   if(document.pointerLockElement===canvas){
     player.yaw -= e.movementX*0.002;
-    player.pitch -= e.movementY*0.002;
-    player.pitch=Math.max(-1.2,Math.min(1.2,player.pitch));
   }
 };
 
 onmousedown=e=>{
-  let dirX = Math.sin(player.yaw);
-  let dirZ = Math.cos(player.yaw);
+  let dx=Math.sin(player.yaw);
+  let dz=Math.cos(player.yaw);
 
-  let hit = {
-    x: player.x + dirX*10,
-    z: player.z + dirZ*10
+  let hit={
+    x:player.x+dx*10,
+    z:player.z+dz*10
   };
 
-  if(e.button===0) portalA=hit;
-  if(e.button===2) portalB=hit;
+  if(e.button===0) A=hit;
+  if(e.button===2) B=hit;
 };
 
 oncontextmenu=e=>e.preventDefault();
 
-// TELEPORT
-function checkTeleport(){
-  if(!portalA || !portalB) return;
+// teleport
+function teleport(){
+  if(!A||!B) return;
 
-  let dA = Math.hypot(player.x-portalA.x, player.z-portalA.z);
-  let dB = Math.hypot(player.x-portalB.x, player.z-portalB.z);
+  let dA=Math.hypot(player.x-A.x,player.z-A.z);
+  let dB=Math.hypot(player.x-B.x,player.z-B.z);
 
   if(dA<1){
-    player.x = portalB.x;
-    player.z = portalB.z;
+    player.x=B.x;
+    player.z=B.z;
   } else if(dB<1){
-    player.x = portalA.x;
-    player.z = portalA.z;
+    player.x=A.x;
+    player.z=A.z;
   }
 }
 
-// PROJECTION
-function project(x,y,z){
-  let dx = x-player.x;
-  let dy = y-player.y;
-  let dz = z-player.z;
+// projection
+function proj(x,z){
+  let dx=x-player.x;
+  let dz=z-player.z;
 
-  let cosY = Math.cos(player.yaw);
-  let sinY = Math.sin(player.yaw);
+  let cos=Math.cos(player.yaw);
+  let sin=Math.sin(player.yaw);
 
-  let rx = dx*cosY - dz*sinY;
-  let rz = dx*sinY + dz*cosY;
+  let rx=dx*cos-dz*sin;
+  let rz=dx*sin+dz*cos;
 
-  let scale = 300/(rz+10);
+  let s=300/(rz+10);
 
   return {
-    x: canvas.width/2 + rx*scale,
-    y: canvas.height/2 - dy*scale,
-    s: scale,
-    depth: rz
+    x:canvas.width/2+rx*s,
+    y:canvas.height/2,
+    s:s,
+    d:rz
   };
 }
 
-// LOOP
+// loop
 function loop(){
   requestAnimationFrame(loop);
 
-  // MOVEMENT
-  let speed=0.08;
-
-  let forwardX = Math.sin(player.yaw);
-  let forwardZ = Math.cos(player.yaw);
+  let speed=0.1;
 
   if(keys["w"]){
-    player.vx += forwardX*speed;
-    player.vz += forwardZ*speed;
+    player.x+=Math.sin(player.yaw)*speed;
+    player.z+=Math.cos(player.yaw)*speed;
   }
   if(keys["s"]){
-    player.vx -= forwardX*speed;
-    player.vz -= forwardZ*speed;
+    player.x-=Math.sin(player.yaw)*speed;
+    player.z-=Math.cos(player.yaw)*speed;
   }
 
-  if(keys["a"]) player.yaw += 0.04;
-  if(keys["d"]) player.yaw -= 0.04;
+  if(keys["a"]) player.yaw+=0.05;
+  if(keys["d"]) player.yaw-=0.05;
 
-  // JUMP + GRAVITY
-  player.vy -= 0.01;
+  teleport();
 
-  if(keys[" "] && player.onGround){
-    player.vy = 0.25;
-    player.onGround=false;
-  }
-
-  player.x += player.vx;
-  player.y += player.vy;
-  player.z += player.vz;
-
-  // friction
-  player.vx *= 0.9;
-  player.vz *= 0.9;
-
-  // ground
-  if(player.y < 1){
-    player.y = 1;
-    player.vy = 0;
-    player.onGround=true;
-  }
-
-  checkTeleport();
-
-  // DRAW
-  ctx.fillStyle="#111";
+  ctx.fillStyle="black";
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  // sort by depth
-  let drawList = [];
-
-  for(let c of cubes){
-    let p = project(c.x,0,c.z);
-    drawList.push({p,c});
+  // draw buildings
+  let list=[];
+  for(let b of buildings){
+    let p=proj(b.x,b.z);
+    list.push({b,p});
   }
 
-  drawList.sort((a,b)=>b.p.depth-a.p.depth);
+  list.sort((a,b)=>b.p.d-a.p.d);
 
-  for(let obj of drawList){
-    let c=obj.c;
-    let p=obj.p;
+  for(let o of list){
+    let b=o.b;
+    let p=o.p;
 
-    let w = c.size*p.s;
-    let h = c.h*p.s;
+    let w=b.size*p.s;
+    let h=b.h*p.s;
 
     ctx.fillStyle="#888";
     ctx.fillRect(p.x-w/2,p.y-h,w,h);
   }
 
   // portals
-  function drawPortal(p,color){
+  function draw(p,color){
     if(!p) return;
-    let pr = project(p.x,0,p.z);
+    let pr=proj(p.x,p.z);
     ctx.fillStyle=color;
     ctx.beginPath();
     ctx.arc(pr.x, pr.y, 20*pr.s, 0, Math.PI*2);
     ctx.fill();
   }
 
-  drawPortal(portalA,"blue");
-  drawPortal(portalB,"orange");
+  draw(A,"blue");
+  draw(B,"orange");
 }
 
 loop();
