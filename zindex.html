@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Portal FPS TRUE AIM</title>
+<title>Portal FPS REAL</title>
 <style>
   body { margin:0; overflow:hidden; }
 </style>
@@ -19,6 +19,16 @@ scene.background = new THREE.Color(0x87ceeb);
 // ===== CAMERA =====
 const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
 
+// ===== FPS CAMERA SYSTEM =====
+const pitchObject = new THREE.Object3D();
+pitchObject.add(camera);
+
+const yawObject = new THREE.Object3D();
+yawObject.position.set(0, 2, 0);
+yawObject.add(pitchObject);
+
+scene.add(yawObject);
+
 // ===== RENDERER =====
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(innerWidth, innerHeight);
@@ -26,6 +36,7 @@ document.body.appendChild(renderer.domElement);
 
 // ===== LIGHT =====
 scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+
 const light = new THREE.DirectionalLight(0xffffff, 1);
 light.position.set(10,20,10);
 scene.add(light);
@@ -56,11 +67,6 @@ for(let i=0;i<80;i++){
   scene.add(b);
 }
 
-// ===== PLAYER =====
-let x=0, y=2, z=0;
-let yaw=0;
-let pitch=0;
-
 // ===== CONTROLS =====
 let keys={};
 
@@ -69,19 +75,18 @@ addEventListener("keyup", e=>keys[e.key.toLowerCase()]=false);
 
 document.body.onclick = ()=>document.body.requestPointerLock();
 
+// ===== MOUSE LOOK (FIXED) =====
 addEventListener("mousemove", e=>{
   if(document.pointerLockElement){
-    yaw -= e.movementX * 0.002;
-    pitch -= e.movementY * 0.002;
+    yawObject.rotation.y -= e.movementX * 0.002;
+    pitchObject.rotation.x -= e.movementY * 0.002;
 
-    // limit up/down
-    pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
+    pitchObject.rotation.x = Math.max(
+      -Math.PI/2,
+      Math.min(Math.PI/2, pitchObject.rotation.x)
+    );
   }
 });
-
-// ===== VECTORS =====
-const direction = new THREE.Vector3();
-const right = new THREE.Vector3();
 
 // ===== PORTALS =====
 let portalA=null;
@@ -97,16 +102,18 @@ function makePortal(color){
   return p;
 }
 
-// ===== SHOOT PORTAL (NOW FULL 3D AIM) =====
+// ===== SHOOT PORTALS (TRUE AIM) =====
 addEventListener("mousedown", e=>{
   if(e.button!==0) return;
 
-  // get full camera direction
-  camera.getWorldDirection(direction);
+  const dir = new THREE.Vector3();
+  camera.getWorldDirection(dir);
 
-  let px = x + direction.x * 10;
-  let py = y + direction.y * 10;
-  let pz = z + direction.z * 10;
+  const pos = yawObject.position.clone();
+
+  const px = pos.x + dir.x * 10;
+  const py = pos.y + dir.y * 10;
+  const pz = pos.z + dir.z * 10;
 
   clickCount++;
 
@@ -130,18 +137,24 @@ scene.add(gun);
 function teleport(){
   if(!portalA || !portalB) return;
 
-  let dA = Math.hypot(x-portalA.position.x, z-portalA.position.z);
-  let dB = Math.hypot(x-portalB.position.x, z-portalB.position.z);
+  let pos = yawObject.position;
+
+  let dA = Math.hypot(pos.x-portalA.position.x, pos.z-portalA.position.z);
+  let dB = Math.hypot(pos.x-portalB.position.x, pos.z-portalB.position.z);
 
   if(dA < 2){
-    x = portalB.position.x;
-    z = portalB.position.z;
-    y = portalB.position.y;
+    yawObject.position.set(
+      portalB.position.x,
+      portalB.position.y,
+      portalB.position.z
+    );
   }
   else if(dB < 2){
-    x = portalA.position.x;
-    z = portalA.position.z;
-    y = portalA.position.y;
+    yawObject.position.set(
+      portalA.position.x,
+      portalA.position.y,
+      portalA.position.z
+    );
   }
 }
 
@@ -149,47 +162,41 @@ function teleport(){
 function animate(){
   requestAnimationFrame(animate);
 
-  // rotation
-  camera.rotation.set(pitch, -yaw, 0);
+  const forward = new THREE.Vector3();
+  yawObject.getWorldDirection(forward);
+  forward.y = 0;
+  forward.normalize();
 
-  // direction (forward)
-  camera.getWorldDirection(direction);
-  direction.y = 0;
-  direction.normalize();
-
-  // right vector
-  right.crossVectors(direction, new THREE.Vector3(0,1,0)).normalize();
+  const right = new THREE.Vector3();
+  right.crossVectors(forward, new THREE.Vector3(0,1,0)).normalize();
 
   let speed = 0.2;
 
   if(keys["w"]){
-    x += direction.x * speed;
-    z += direction.z * speed;
+    yawObject.position.add(forward.clone().multiplyScalar(speed));
   }
   if(keys["s"]){
-    x -= direction.x * speed;
-    z -= direction.z * speed;
+    yawObject.position.add(forward.clone().multiplyScalar(-speed));
   }
   if(keys["a"]){
-    x -= right.x * speed;
-    z -= right.z * speed;
+    yawObject.position.add(right.clone().multiplyScalar(-speed));
   }
   if(keys["d"]){
-    x += right.x * speed;
-    z += right.z * speed;
+    yawObject.position.add(right.clone().multiplyScalar(speed));
   }
 
   teleport();
 
-  // camera position
-  camera.position.set(x,y,z);
+  // ===== GUN FOLLOW CAMERA =====
+  const dir = new THREE.Vector3();
+  camera.getWorldDirection(dir);
 
-  // ===== GUN LOCK =====
-  camera.getWorldDirection(direction);
+  const rightVec = new THREE.Vector3();
+  rightVec.crossVectors(dir, new THREE.Vector3(0,1,0)).normalize();
 
   gun.position.copy(camera.position);
-  gun.position.add(direction.clone().multiplyScalar(0.8));
-  gun.position.add(right.clone().multiplyScalar(0.4));
+  gun.position.add(dir.clone().multiplyScalar(0.8));
+  gun.position.add(rightVec.clone().multiplyScalar(0.4));
   gun.position.y -= 0.5;
 
   gun.rotation.copy(camera.rotation);
