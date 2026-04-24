@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Portal FPS</title>
+<title>Portal Gun FPS</title>
 <style>
   body { margin:0; overflow:hidden; }
 </style>
@@ -16,7 +16,7 @@
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
 
-// ===== CAMERA (FIRST PERSON) =====
+// ===== CAMERA =====
 const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
 
 // ===== RENDERER =====
@@ -26,7 +26,6 @@ document.body.appendChild(renderer.domElement);
 
 // ===== LIGHT =====
 scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-
 const light = new THREE.DirectionalLight(0xffffff, 1);
 light.position.set(10,20,10);
 scene.add(light);
@@ -39,7 +38,7 @@ const ground = new THREE.Mesh(
 ground.rotation.x = -Math.PI/2;
 scene.add(ground);
 
-// ===== BUILDINGS (same style as your car game) =====
+// ===== BUILDINGS =====
 const buildings=[];
 for(let i=0;i<80;i++){
   let h = Math.random()*10 + 5;
@@ -69,7 +68,6 @@ let keys={};
 addEventListener("keydown", e=>keys[e.key.toLowerCase()]=true);
 addEventListener("keyup", e=>keys[e.key.toLowerCase()]=false);
 
-// mouse look
 document.body.onclick = ()=>document.body.requestPointerLock();
 
 addEventListener("mousemove", e=>{
@@ -81,6 +79,7 @@ addEventListener("mousemove", e=>{
 // ===== PORTALS =====
 let portalA=null;
 let portalB=null;
+let clickCount=0;
 
 function makePortal(color){
   let p = new THREE.Mesh(
@@ -91,25 +90,33 @@ function makePortal(color){
   return p;
 }
 
+// ===== SHOOT PORTAL (LEFT CLICK ONLY) =====
 addEventListener("mousedown", e=>{
+  if(e.button!==0) return;
+
   let dx = Math.sin(yaw);
   let dz = Math.cos(yaw);
 
   let px = x + dx*10;
   let pz = z + dz*10;
 
-  if(e.button===0){
+  clickCount++;
+
+  if(clickCount % 2 === 1){
     if(!portalA) portalA = makePortal(0x0000ff);
     portalA.position.set(px,1,pz);
-  }
-
-  if(e.button===2){
+  } else {
     if(!portalB) portalB = makePortal(0xff8800);
     portalB.position.set(px,1,pz);
   }
 });
 
-addEventListener("contextmenu", e=>e.preventDefault());
+// ===== PORTAL GUN (VISIBLE) =====
+const gun = new THREE.Mesh(
+  new THREE.BoxGeometry(0.3,0.3,1),
+  new THREE.MeshBasicMaterial({color:0xffffff})
+);
+scene.add(gun);
 
 // ===== TELEPORT =====
 function teleport(){
@@ -142,7 +149,6 @@ function animate(){
     x -= Math.sin(yaw) * speed;
     z -= Math.cos(yaw) * speed;
   }
-
   if(keys["a"]){
     x += Math.sin(yaw + Math.PI/2) * speed;
     z += Math.cos(yaw + Math.PI/2) * speed;
@@ -154,13 +160,22 @@ function animate(){
 
   teleport();
 
-  // FIRST PERSON CAMERA
+  // camera
   camera.position.set(x, y, z);
   camera.lookAt(
     x + Math.sin(yaw),
     y,
     z + Math.cos(yaw)
   );
+
+  // ===== GUN POSITION (BOTTOM RIGHT) =====
+  gun.position.set(
+    x + Math.sin(yaw)*1 + Math.sin(yaw - Math.PI/2)*0.5,
+    y - 0.5,
+    z + Math.cos(yaw)*1 + Math.cos(yaw - Math.PI/2)*0.5
+  );
+
+  gun.rotation.y = -yaw;
 
   renderer.render(scene, camera);
 }
