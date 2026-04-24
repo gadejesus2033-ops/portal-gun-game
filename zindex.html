@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Portal FPS FINAL</title>
+<title>Portal FPS TRUE AIM</title>
 <style>
   body { margin:0; overflow:hidden; }
 </style>
@@ -59,6 +59,7 @@ for(let i=0;i<80;i++){
 // ===== PLAYER =====
 let x=0, y=2, z=0;
 let yaw=0;
+let pitch=0;
 
 // ===== CONTROLS =====
 let keys={};
@@ -71,10 +72,14 @@ document.body.onclick = ()=>document.body.requestPointerLock();
 addEventListener("mousemove", e=>{
   if(document.pointerLockElement){
     yaw -= e.movementX * 0.002;
+    pitch -= e.movementY * 0.002;
+
+    // limit up/down
+    pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
   }
 });
 
-// ===== DIRECTION VECTORS =====
+// ===== VECTORS =====
 const direction = new THREE.Vector3();
 const right = new THREE.Vector3();
 
@@ -92,23 +97,25 @@ function makePortal(color){
   return p;
 }
 
+// ===== SHOOT PORTAL (NOW FULL 3D AIM) =====
 addEventListener("mousedown", e=>{
   if(e.button!==0) return;
 
-  let dx = Math.sin(yaw);
-  let dz = Math.cos(yaw);
+  // get full camera direction
+  camera.getWorldDirection(direction);
 
-  let px = x + dx*10;
-  let pz = z + dz*10;
+  let px = x + direction.x * 10;
+  let py = y + direction.y * 10;
+  let pz = z + direction.z * 10;
 
   clickCount++;
 
   if(clickCount % 2 === 1){
     if(!portalA) portalA = makePortal(0x0000ff);
-    portalA.position.set(px,1,pz);
+    portalA.position.set(px,py,pz);
   } else {
     if(!portalB) portalB = makePortal(0xff8800);
-    portalB.position.set(px,1,pz);
+    portalB.position.set(px,py,pz);
   }
 });
 
@@ -129,10 +136,12 @@ function teleport(){
   if(dA < 2){
     x = portalB.position.x;
     z = portalB.position.z;
+    y = portalB.position.y;
   }
   else if(dB < 2){
     x = portalA.position.x;
     z = portalA.position.z;
+    y = portalA.position.y;
   }
 }
 
@@ -140,12 +149,15 @@ function teleport(){
 function animate(){
   requestAnimationFrame(animate);
 
-  // update camera direction
-  camera.rotation.set(0, -yaw, 0);
+  // rotation
+  camera.rotation.set(pitch, -yaw, 0);
+
+  // direction (forward)
   camera.getWorldDirection(direction);
   direction.y = 0;
   direction.normalize();
 
+  // right vector
   right.crossVectors(direction, new THREE.Vector3(0,1,0)).normalize();
 
   let speed = 0.2;
@@ -172,9 +184,10 @@ function animate(){
   // camera position
   camera.position.set(x,y,z);
 
-  // ===== GUN LOCKED TO CAMERA =====
-  gun.position.copy(camera.position);
+  // ===== GUN LOCK =====
+  camera.getWorldDirection(direction);
 
+  gun.position.copy(camera.position);
   gun.position.add(direction.clone().multiplyScalar(0.8));
   gun.position.add(right.clone().multiplyScalar(0.4));
   gun.position.y -= 0.5;
