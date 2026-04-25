@@ -2,12 +2,23 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Portal Police AI</title>
+<title>Portal Escape Game</title>
 <style>
   body { margin:0; overflow:hidden; }
+  #ui{
+    position:fixed;
+    top:10px;
+    left:10px;
+    color:white;
+    font-family:Arial;
+    font-size:18px;
+    z-index:10;
+  }
 </style>
 </head>
 <body>
+
+<div id="ui">Reach the green zone!</div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
 
@@ -19,7 +30,7 @@ scene.background = new THREE.Color(0x87ceeb);
 // ===== CAMERA =====
 const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
 
-// ===== FPS CAMERA =====
+// FPS camera
 const pitch = new THREE.Object3D();
 pitch.add(camera);
 
@@ -51,12 +62,10 @@ scene.add(ground);
 const buildings=[];
 for(let i=0;i<40;i++){
   let h=Math.random()*8+4;
-
   let b=new THREE.Mesh(
     new THREE.BoxGeometry(4,h,4),
     new THREE.MeshLambertMaterial({color:0x888888})
   );
-
   b.position.set((Math.random()-0.5)*120,h/2,(Math.random()-0.5)*120);
   scene.add(b);
   buildings.push(b);
@@ -64,10 +73,8 @@ for(let i=0;i<40;i++){
 
 // ===== INPUT =====
 let keys={};
-
 addEventListener("keydown",e=>{
   keys[e.key.toLowerCase()]=true;
-
   if(e.code==="Space" && onGround){
     velocityY = jumpPower;
     onGround = false;
@@ -75,16 +82,14 @@ addEventListener("keydown",e=>{
 });
 addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
 
-document.body.addEventListener("click",()=>{
-  document.body.requestPointerLock();
-});
+document.body.onclick=()=>document.body.requestPointerLock();
 
 // ===== LOOK =====
 addEventListener("mousemove",e=>{
-  if(document.pointerLockElement === document.body){
+  if(document.pointerLockElement){
     yaw.rotation.y -= e.movementX*0.002;
     pitch.rotation.x -= e.movementY*0.002;
-    pitch.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch.rotation.x));
+    pitch.rotation.x=Math.max(-Math.PI/2,Math.min(Math.PI/2,pitch.rotation.x));
   }
 });
 
@@ -138,7 +143,6 @@ addEventListener("mousedown",e=>{
   if(e.button!==0 || !lastHit) return;
 
   clickCount++;
-
   if(clickCount%2){
     if(!portalA) portalA=makePortal(0x0000ff);
     portalA.position.copy(lastHit.point);
@@ -155,7 +159,6 @@ function teleport(){
   if(!portalA||!portalB||cooldown>0) return;
 
   let pos=yaw.position;
-
   let dA=Math.hypot(pos.x-portalA.position.x,pos.z-portalA.position.z);
   let dB=Math.hypot(pos.x-portalB.position.x,pos.z-portalB.position.z);
 
@@ -185,16 +188,13 @@ gun.position.set(0.6,-0.5,-1.2);
 
 // ===== POLICE =====
 const police=[];
-
 for(let i=0;i<5;i++){
   let p=new THREE.Mesh(
     new THREE.BoxGeometry(1,2,1),
     new THREE.MeshLambertMaterial({color:0xff0000})
   );
-
   p.position.set((Math.random()-0.5)*100,1,(Math.random()-0.5)*100);
   scene.add(p);
-
   police.push({mesh:p,speed:0.05});
 }
 
@@ -212,13 +212,36 @@ function policeTeleport(p){
   if(!portalA||!portalB) return;
 
   let pos=p.mesh.position;
-
   let dA=Math.hypot(pos.x-portalA.position.x,pos.z-portalA.position.z);
   let dB=Math.hypot(pos.x-portalB.position.x,pos.z-portalB.position.z);
 
   if(dA<2) p.mesh.position.copy(portalB.position);
   else if(dB<2) p.mesh.position.copy(portalA.position);
 }
+
+// ===== ESCAPE ZONE =====
+let escapeZone;
+
+function createEscapeZone(){
+  if(escapeZone) scene.remove(escapeZone);
+
+  escapeZone = new THREE.Mesh(
+    new THREE.CylinderGeometry(2,2,0.5,32),
+    new THREE.MeshBasicMaterial({color:0x00ff00})
+  );
+
+  escapeZone.rotation.x = Math.PI/2;
+
+  escapeZone.position.set(
+    (Math.random()-0.5)*100,
+    0.2,
+    (Math.random()-0.5)*100
+  );
+
+  scene.add(escapeZone);
+}
+
+createEscapeZone();
 
 // ===== LOOP =====
 function animate(){
@@ -238,8 +261,7 @@ function animate(){
 
   // movement
   let forward=new THREE.Vector3(0,0,-1).applyQuaternion(yaw.quaternion);
-  forward.y=0;
-  forward.normalize();
+  forward.y=0; forward.normalize();
 
   let right=new THREE.Vector3(1,0,0).applyQuaternion(yaw.quaternion);
   right.normalize();
@@ -270,32 +292,41 @@ function animate(){
 
   teleport();
 
-  // ===== POLICE AI =====
+  // police AI
   for(let p of police){
-    let dx = yaw.position.x - p.mesh.position.x;
-    let dz = yaw.position.z - p.mesh.position.z;
-    let dist = Math.hypot(dx,dz);
+    let dx=yaw.position.x-p.mesh.position.x;
+    let dz=yaw.position.z-p.mesh.position.z;
+    let dist=Math.hypot(dx,dz);
 
-    if(dist > 0){
-      dx /= dist;
-      dz /= dist;
-    }
+    if(dist>0){ dx/=dist; dz/=dist; }
 
-    let nx = p.mesh.position.x + dx * p.speed;
-    let nz = p.mesh.position.z + dz * p.speed;
+    let nx=p.mesh.position.x+dx*p.speed;
+    let nz=p.mesh.position.z+dz*p.speed;
 
     if(policeCanMove(nx,nz)){
-      p.mesh.position.x = nx;
-      p.mesh.position.z = nz;
+      p.mesh.position.x=nx;
+      p.mesh.position.z=nz;
     }
 
     policeTeleport(p);
 
-    // GAME OVER
-    if(dist < 1.5){
+    if(dist<1.5){
       alert("Caught!");
       location.reload();
     }
+  }
+
+  // win
+  let dx=yaw.position.x-escapeZone.position.x;
+  let dz=yaw.position.z-escapeZone.position.z;
+  let dist=Math.hypot(dx,dz);
+
+  if(dist<3){
+    document.getElementById("ui").innerText="ESCAPED!";
+    createEscapeZone();
+    setTimeout(()=>{
+      document.getElementById("ui").innerText="Reach the green zone!";
+    },1500);
   }
 
   renderer.render(scene,camera);
