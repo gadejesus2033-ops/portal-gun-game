@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Portal Laser Game (Movement Fixed)</title>
+<title>Portal Police AI</title>
 <style>
   body { margin:0; overflow:hidden; }
 </style>
@@ -75,7 +75,6 @@ addEventListener("keydown",e=>{
 });
 addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
 
-// click to lock mouse
 document.body.addEventListener("click",()=>{
   document.body.requestPointerLock();
 });
@@ -109,13 +108,10 @@ function canMove(x,z){
 
 // ===== LASER =====
 const raycaster = new THREE.Raycaster();
-
-const laserMat = new THREE.LineBasicMaterial({color:0xff0000});
-const laserGeom = new THREE.BufferGeometry().setFromPoints([
-  new THREE.Vector3(),
-  new THREE.Vector3()
-]);
-const laser = new THREE.Line(laserGeom, laserMat);
+const laser = new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]),
+  new THREE.LineBasicMaterial({color:0xff0000})
+);
 scene.add(laser);
 
 const preview = new THREE.Mesh(
@@ -163,12 +159,8 @@ function teleport(){
   let dA=Math.hypot(pos.x-portalA.position.x,pos.z-portalA.position.z);
   let dB=Math.hypot(pos.x-portalB.position.x,pos.z-portalB.position.z);
 
-  if(dA<2){
-    exitPortal(portalB);
-  }
-  else if(dB<2){
-    exitPortal(portalA);
-  }
+  if(dA<2) exitPortal(portalB);
+  else if(dB<2) exitPortal(portalA);
 }
 
 function exitPortal(portal){
@@ -191,25 +183,60 @@ const gun=new THREE.Mesh(
 camera.add(gun);
 gun.position.set(0.6,-0.5,-1.2);
 
+// ===== POLICE =====
+const police=[];
+
+for(let i=0;i<5;i++){
+  let p=new THREE.Mesh(
+    new THREE.BoxGeometry(1,2,1),
+    new THREE.MeshLambertMaterial({color:0xff0000})
+  );
+
+  p.position.set((Math.random()-0.5)*100,1,(Math.random()-0.5)*100);
+  scene.add(p);
+
+  police.push({mesh:p,speed:0.05});
+}
+
+function policeCanMove(x,z){
+  for(let b of buildings){
+    if(Math.abs(x - b.position.x) < 3 &&
+       Math.abs(z - b.position.z) < 3){
+      return false;
+    }
+  }
+  return true;
+}
+
+function policeTeleport(p){
+  if(!portalA||!portalB) return;
+
+  let pos=p.mesh.position;
+
+  let dA=Math.hypot(pos.x-portalA.position.x,pos.z-portalA.position.z);
+  let dB=Math.hypot(pos.x-portalB.position.x,pos.z-portalB.position.z);
+
+  if(dA<2) p.mesh.position.copy(portalB.position);
+  else if(dB<2) p.mesh.position.copy(portalA.position);
+}
+
 // ===== LOOP =====
 function animate(){
   requestAnimationFrame(animate);
 
   if(cooldown>0) cooldown--;
 
-  // ===== LASER =====
+  // laser
   raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
-
   const hits = raycaster.intersectObjects([ground, ...buildings]);
 
-  if(hits.length > 0){
+  if(hits.length>0){
     lastHit = hits[0];
-
     laser.geometry.setFromPoints([camera.position, hits[0].point]);
     preview.position.copy(hits[0].point);
   }
 
-  // ===== MOVEMENT =====
+  // movement
   let forward=new THREE.Vector3(0,0,-1).applyQuaternion(yaw.quaternion);
   forward.y=0;
   forward.normalize();
@@ -221,34 +248,61 @@ function animate(){
   let nz=yaw.position.z;
   let speed=0.2;
 
-  if(keys["w"]){ nx += forward.x*speed; nz += forward.z*speed; }
-  if(keys["s"]){ nx -= forward.x*speed; nz -= forward.z*speed; }
-  if(keys["a"]){ nx -= right.x*speed; nz -= right.z*speed; }
-  if(keys["d"]){ nx += right.x*speed; nz += right.z*speed; }
+  if(keys["w"]){ nx+=forward.x*speed; nz+=forward.z*speed; }
+  if(keys["s"]){ nx-=forward.x*speed; nz-=forward.z*speed; }
+  if(keys["a"]){ nx-=right.x*speed; nz-=right.z*speed; }
+  if(keys["d"]){ nx+=right.x*speed; nz+=right.z*speed; }
 
   if(canMove(nx,nz)){
-    yaw.position.x = nx;
-    yaw.position.z = nz;
+    yaw.position.x=nx;
+    yaw.position.z=nz;
   }
 
-  // ===== GRAVITY =====
-  velocityY += gravity;
-  yaw.position.y += velocityY;
+  // gravity
+  velocityY+=gravity;
+  yaw.position.y+=velocityY;
 
-  if(yaw.position.y <= groundHeight){
-    yaw.position.y = groundHeight;
-    velocityY = 0;
-    onGround = true;
+  if(yaw.position.y<=groundHeight){
+    yaw.position.y=groundHeight;
+    velocityY=0;
+    onGround=true;
   }
 
   teleport();
+
+  // ===== POLICE AI =====
+  for(let p of police){
+    let dx = yaw.position.x - p.mesh.position.x;
+    let dz = yaw.position.z - p.mesh.position.z;
+    let dist = Math.hypot(dx,dz);
+
+    if(dist > 0){
+      dx /= dist;
+      dz /= dist;
+    }
+
+    let nx = p.mesh.position.x + dx * p.speed;
+    let nz = p.mesh.position.z + dz * p.speed;
+
+    if(policeCanMove(nx,nz)){
+      p.mesh.position.x = nx;
+      p.mesh.position.z = nz;
+    }
+
+    policeTeleport(p);
+
+    // GAME OVER
+    if(dist < 1.5){
+      alert("Caught!");
+      location.reload();
+    }
+  }
 
   renderer.render(scene,camera);
 }
 
 animate();
 
-// ===== RESIZE =====
 addEventListener("resize",()=>{
   camera.aspect=innerWidth/innerHeight;
   camera.updateProjectionMatrix();
