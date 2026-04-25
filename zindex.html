@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Portal FPS (Fixed Properly)</title>
+<title>Portal FPS (With Jump + Fixes)</title>
 <style>
   body { margin:0; overflow:hidden; }
 </style>
@@ -19,12 +19,12 @@ scene.background = new THREE.Color(0x87ceeb);
 // ===== CAMERA =====
 const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
 
-// ===== FPS CAMERA SYSTEM =====
+// ===== FPS CAMERA =====
 const pitch = new THREE.Object3D();
 pitch.add(camera);
 
 const yaw = new THREE.Object3D();
-yaw.position.set(0, 2, 0);
+yaw.position.set(0,2,0);
 yaw.add(pitch);
 
 scene.add(yaw);
@@ -35,8 +35,8 @@ renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 
 // ===== LIGHT =====
-scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-const light = new THREE.DirectionalLight(0xffffff, 1);
+scene.add(new THREE.AmbientLight(0xffffff,0.6));
+const light = new THREE.DirectionalLight(0xffffff,1);
 light.position.set(10,20,10);
 scene.add(light);
 
@@ -51,39 +51,40 @@ scene.add(ground);
 // ===== BUILDINGS =====
 const buildings=[];
 for(let i=0;i<60;i++){
-  let h = Math.random()*8 + 4;
+  let h=Math.random()*8+4;
 
-  let b = new THREE.Mesh(
+  let b=new THREE.Mesh(
     new THREE.BoxGeometry(4,h,4),
     new THREE.MeshLambertMaterial({color:0x888888})
   );
 
-  b.position.set(
-    (Math.random()-0.5)*150,
-    h/2,
-    (Math.random()-0.5)*150
-  );
-
+  b.position.set((Math.random()-0.5)*150,h/2,(Math.random()-0.5)*150);
   scene.add(b);
   buildings.push(b);
 }
 
 // ===== INPUT =====
 let keys={};
-
 addEventListener("keydown",e=>keys[e.key.toLowerCase()]=true);
 addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
 
 document.body.onclick=()=>document.body.requestPointerLock();
 
+// ===== LOOK =====
 addEventListener("mousemove",e=>{
   if(document.pointerLockElement){
-    yaw.rotation.y -= e.movementX * 0.002;
-    pitch.rotation.x -= e.movementY * 0.002;
-
-    pitch.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch.rotation.x));
+    yaw.rotation.y -= e.movementX*0.002;
+    pitch.rotation.x -= e.movementY*0.002;
+    pitch.rotation.x=Math.max(-Math.PI/2,Math.min(Math.PI/2,pitch.rotation.x));
   }
 });
+
+// ===== PLAYER PHYSICS =====
+let velocityY = 0;
+let onGround = true;
+const gravity = -0.01;
+const jumpPower = 0.25;
+const groundHeight = 2;
 
 // ===== COLLISION =====
 function canMove(x,z){
@@ -97,12 +98,10 @@ function canMove(x,z){
 }
 
 // ===== PORTALS =====
-let portalA=null;
-let portalB=null;
-let clickCount=0;
+let portalA=null, portalB=null, clickCount=0;
 
 function makePortal(color){
-  let p = new THREE.Mesh(
+  let p=new THREE.Mesh(
     new THREE.TorusGeometry(1,0.25,16,100),
     new THREE.MeshBasicMaterial({color})
   );
@@ -113,96 +112,108 @@ function makePortal(color){
 addEventListener("mousedown",e=>{
   if(e.button!==0) return;
 
-  let dir = new THREE.Vector3();
+  let dir=new THREE.Vector3();
   camera.getWorldDirection(dir);
 
-  let px = yaw.position.x + dir.x * 10;
-  let py = yaw.position.y + dir.y * 10;
-  let pz = yaw.position.z + dir.z * 10;
+  let px=yaw.position.x+dir.x*10;
+  let py=yaw.position.y+dir.y*10;
+  let pz=yaw.position.z+dir.z*10;
 
   clickCount++;
 
-  if(clickCount % 2){
-    if(!portalA) portalA = makePortal(0x0000ff);
+  if(clickCount%2){
+    if(!portalA) portalA=makePortal(0x0000ff);
     portalA.position.set(px,py,pz);
-  } else {
-    if(!portalB) portalB = makePortal(0xff8800);
+  }else{
+    if(!portalB) portalB=makePortal(0xff8800);
     portalB.position.set(px,py,pz);
   }
 });
 
-// ===== TELEPORT (FIXED) =====
-let lastPortal = null;
+// ===== TELEPORT =====
+let cooldown=0;
 
 function teleport(){
-  if(!portalA || !portalB) return;
+  if(!portalA||!portalB||cooldown>0) return;
 
-  let pos = yaw.position;
+  let pos=yaw.position;
 
-  let dA = Math.hypot(pos.x-portalA.position.x, pos.z-portalA.position.z);
-  let dB = Math.hypot(pos.x-portalB.position.x, pos.z-portalB.position.z);
+  let dA=Math.hypot(pos.x-portalA.position.x,pos.z-portalA.position.z);
+  let dB=Math.hypot(pos.x-portalB.position.x,pos.z-portalB.position.z);
 
-  if(dA < 2 && lastPortal !== "A"){
-    yaw.position.copy(portalB.position);
-    lastPortal = "A";
+  if(dA<2){
+    exitPortal(portalB);
   }
-  else if(dB < 2 && lastPortal !== "B"){
-    yaw.position.copy(portalA.position);
-    lastPortal = "B";
-  }
-
-  if(dA > 3 && dB > 3){
-    lastPortal = null;
+  else if(dB<2){
+    exitPortal(portalA);
   }
 }
 
-// ===== GUN (ALWAYS VISIBLE) =====
-const gun = new THREE.Mesh(
+function exitPortal(portal){
+  let dir=new THREE.Vector3();
+  camera.getWorldDirection(dir);
+
+  yaw.position.copy(portal.position);
+  yaw.position.add(dir.multiplyScalar(3)); // push OUT
+
+  yaw.position.y = groundHeight;
+  velocityY = 0;
+
+  cooldown = 20;
+}
+
+// ===== GUN =====
+const gun=new THREE.Mesh(
   new THREE.BoxGeometry(0.4,0.4,1),
   new THREE.MeshBasicMaterial({color:0xffffff})
 );
-camera.add(gun); // attach directly to camera
-gun.position.set(0.5, -0.5, -1.5);
+camera.add(gun);
+gun.position.set(0.5,-0.5,-1.5);
 
 // ===== LOOP =====
 function animate(){
   requestAnimationFrame(animate);
 
-  let speed = 0.2;
+  if(cooldown>0) cooldown--;
 
-  // REAL FORWARD VECTOR
-  let forward = new THREE.Vector3(0,0,-1);
+  // forward
+  let forward=new THREE.Vector3(0,0,-1);
   forward.applyQuaternion(yaw.quaternion);
-  forward.y = 0;
+  forward.y=0;
   forward.normalize();
 
-  let right = new THREE.Vector3(1,0,0);
+  let right=new THREE.Vector3(1,0,0);
   right.applyQuaternion(yaw.quaternion);
   right.normalize();
 
-  let nx = yaw.position.x;
-  let nz = yaw.position.z;
+  let nx=yaw.position.x;
+  let nz=yaw.position.z;
 
-  if(keys["w"]){
-    nx += forward.x * speed;
-    nz += forward.z * speed;
-  }
-  if(keys["s"]){
-    nx -= forward.x * speed;
-    nz -= forward.z * speed;
-  }
-  if(keys["a"]){
-    nx -= right.x * speed;
-    nz -= right.z * speed;
-  }
-  if(keys["d"]){
-    nx += right.x * speed;
-    nz += right.z * speed;
-  }
+  let speed=0.2;
+
+  if(keys["w"]){ nx += forward.x*speed; nz += forward.z*speed; }
+  if(keys["s"]){ nx -= forward.x*speed; nz -= forward.z*speed; }
+  if(keys["a"]){ nx -= right.x*speed; nz -= right.z*speed; }
+  if(keys["d"]){ nx += right.x*speed; nz += right.z*speed; }
 
   if(canMove(nx,nz)){
-    yaw.position.x = nx;
-    yaw.position.z = nz;
+    yaw.position.x=nx;
+    yaw.position.z=nz;
+  }
+
+  // ===== JUMP =====
+  if(keys[" "] && onGround){
+    velocityY = jumpPower;
+    onGround = false;
+  }
+
+  velocityY += gravity;
+  yaw.position.y += velocityY;
+
+  if(yaw.position.y <= groundHeight){
+    yaw.position.y = groundHeight;
+    velocityY = 0;
+    onGround = true;
   }
 
   teleport();
@@ -213,7 +224,7 @@ function animate(){
 animate();
 
 addEventListener("resize",()=>{
-  camera.aspect = innerWidth/innerHeight;
+  camera.aspect=innerWidth/innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth,innerHeight);
 });
