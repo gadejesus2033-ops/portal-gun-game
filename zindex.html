@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Portal FPS</title>
+<title>Portal FPS FINAL</title>
 <style>
   body { margin:0; overflow:hidden; }
 </style>
@@ -19,7 +19,7 @@ scene.background = new THREE.Color(0x87ceeb);
 // ===== CAMERA =====
 const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
 
-// ===== FPS CAMERA SYSTEM =====
+// ===== FPS CAMERA =====
 const pitchObject = new THREE.Object3D();
 pitchObject.add(camera);
 
@@ -48,7 +48,9 @@ const ground = new THREE.Mesh(
 ground.rotation.x = -Math.PI/2;
 scene.add(ground);
 
-// ===== BUILDINGS =====
+// ===== BUILDINGS + COLLISION DATA =====
+const buildings=[];
+
 for(let i=0;i<80;i++){
   let h = Math.random()*10 + 5;
 
@@ -64,6 +66,11 @@ for(let i=0;i<80;i++){
   );
 
   scene.add(b);
+
+  buildings.push({
+    mesh:b,
+    size:2 // half width
+  });
 }
 
 // ===== CONTROLS =====
@@ -83,6 +90,19 @@ addEventListener("mousemove", e=>{
     pitchObject.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitchObject.rotation.x));
   }
 });
+
+// ===== COLLISION FUNCTION =====
+function canMove(newPos){
+  for(let b of buildings){
+    let dx = newPos.x - b.mesh.position.x;
+    let dz = newPos.z - b.mesh.position.z;
+
+    if(Math.abs(dx) < b.size + 1 && Math.abs(dz) < b.size + 1){
+      return false;
+    }
+  }
+  return true;
+}
 
 // ===== PORTALS =====
 let portalA=null;
@@ -138,10 +158,10 @@ function teleport(){
   let dB = Math.hypot(pos.x-portalB.position.x, pos.z-portalB.position.z);
 
   if(dA < 2){
-    yawObject.position.set(portalB.position.x, portalB.position.y, portalB.position.z);
+    yawObject.position.copy(portalB.position);
   }
   else if(dB < 2){
-    yawObject.position.set(portalA.position.x, portalA.position.y, portalA.position.z);
+    yawObject.position.copy(portalA.position);
   }
 }
 
@@ -154,22 +174,26 @@ function animate(){
   forward.y = 0;
   forward.normalize();
 
-  // FIX FOR W FORWARD
-  forward.multiplyScalar(-1);
-
   const right = new THREE.Vector3();
   right.crossVectors(forward, new THREE.Vector3(0,1,0)).normalize();
 
   let speed = 0.2;
 
-  if(keys["w"]) yawObject.position.add(forward.clone().multiplyScalar(speed));
-  if(keys["s"]) yawObject.position.add(forward.clone().multiplyScalar(-speed));
-  if(keys["a"]) yawObject.position.add(right.clone().multiplyScalar(-speed));
-  if(keys["d"]) yawObject.position.add(right.clone().multiplyScalar(speed));
+  let newPos = yawObject.position.clone();
+
+  if(keys["w"]) newPos.add(forward.clone().multiplyScalar(speed));
+  if(keys["s"]) newPos.add(forward.clone().multiplyScalar(-speed));
+  if(keys["a"]) newPos.add(right.clone().multiplyScalar(-speed));
+  if(keys["d"]) newPos.add(right.clone().multiplyScalar(speed));
+
+  // APPLY COLLISION
+  if(canMove(newPos)){
+    yawObject.position.copy(newPos);
+  }
 
   teleport();
 
-  // ===== GUN FOLLOW CAMERA =====
+  // ===== GUN =====
   const dir = new THREE.Vector3();
   camera.getWorldDirection(dir);
 
