@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Portal Laser Game</title>
+<title>Portal Laser Game (Movement Fixed)</title>
 <style>
   body { margin:0; overflow:hidden; }
 </style>
@@ -67,6 +67,7 @@ let keys={};
 
 addEventListener("keydown",e=>{
   keys[e.key.toLowerCase()]=true;
+
   if(e.code==="Space" && onGround){
     velocityY = jumpPower;
     onGround = false;
@@ -74,14 +75,17 @@ addEventListener("keydown",e=>{
 });
 addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
 
-document.body.onclick=()=>document.body.requestPointerLock();
+// click to lock mouse
+document.body.addEventListener("click",()=>{
+  document.body.requestPointerLock();
+});
 
 // ===== LOOK =====
 addEventListener("mousemove",e=>{
-  if(document.pointerLockElement){
+  if(document.pointerLockElement === document.body){
     yaw.rotation.y -= e.movementX*0.002;
     pitch.rotation.x -= e.movementY*0.002;
-    pitch.rotation.x=Math.max(-Math.PI/2,Math.min(Math.PI/2,pitch.rotation.x));
+    pitch.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch.rotation.x));
   }
 });
 
@@ -103,10 +107,9 @@ function canMove(x,z){
   return true;
 }
 
-// ===== RAYCASTER (LASER) =====
+// ===== LASER =====
 const raycaster = new THREE.Raycaster();
 
-// laser line
 const laserMat = new THREE.LineBasicMaterial({color:0xff0000});
 const laserGeom = new THREE.BufferGeometry().setFromPoints([
   new THREE.Vector3(),
@@ -115,12 +118,13 @@ const laserGeom = new THREE.BufferGeometry().setFromPoints([
 const laser = new THREE.Line(laserGeom, laserMat);
 scene.add(laser);
 
-// preview point
 const preview = new THREE.Mesh(
   new THREE.SphereGeometry(0.3,16,16),
   new THREE.MeshBasicMaterial({color:0xffff00})
 );
 scene.add(preview);
+
+let lastHit=null;
 
 // ===== PORTALS =====
 let portalA=null, portalB=null, clickCount=0;
@@ -134,9 +138,6 @@ function makePortal(color){
   return p;
 }
 
-let lastHit = null;
-
-// ===== SHOOT =====
 addEventListener("mousedown",e=>{
   if(e.button!==0 || !lastHit) return;
 
@@ -196,20 +197,15 @@ function animate(){
 
   if(cooldown>0) cooldown--;
 
-  // ===== LASER UPDATE =====
+  // ===== LASER =====
   raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
 
-  const objects = [ground, ...buildings];
-  const hits = raycaster.intersectObjects(objects);
+  const hits = raycaster.intersectObjects([ground, ...buildings]);
 
   if(hits.length > 0){
     lastHit = hits[0];
 
-    laser.geometry.setFromPoints([
-      camera.position,
-      hits[0].point
-    ]);
-
+    laser.geometry.setFromPoints([camera.position, hits[0].point]);
     preview.position.copy(hits[0].point);
   }
 
@@ -225,24 +221,24 @@ function animate(){
   let nz=yaw.position.z;
   let speed=0.2;
 
-  if(keys["w"]){ nx+=forward.x*speed; nz+=forward.z*speed; }
-  if(keys["s"]){ nx-=forward.x*speed; nz-=forward.z*speed; }
-  if(keys["a"]){ nx-=right.x*speed; nz-=right.z*speed; }
-  if(keys["d"]){ nx+=right.x*speed; nz+=right.z*speed; }
+  if(keys["w"]){ nx += forward.x*speed; nz += forward.z*speed; }
+  if(keys["s"]){ nx -= forward.x*speed; nz -= forward.z*speed; }
+  if(keys["a"]){ nx -= right.x*speed; nz -= right.z*speed; }
+  if(keys["d"]){ nx += right.x*speed; nz += right.z*speed; }
 
   if(canMove(nx,nz)){
-    yaw.position.x=nx;
-    yaw.position.z=nz;
+    yaw.position.x = nx;
+    yaw.position.z = nz;
   }
 
-  // gravity
-  velocityY+=gravity;
-  yaw.position.y+=velocityY;
+  // ===== GRAVITY =====
+  velocityY += gravity;
+  yaw.position.y += velocityY;
 
-  if(yaw.position.y<=groundHeight){
-    yaw.position.y=groundHeight;
-    velocityY=0;
-    onGround=true;
+  if(yaw.position.y <= groundHeight){
+    yaw.position.y = groundHeight;
+    velocityY = 0;
+    onGround = true;
   }
 
   teleport();
@@ -252,6 +248,7 @@ function animate(){
 
 animate();
 
+// ===== RESIZE =====
 addEventListener("resize",()=>{
   camera.aspect=innerWidth/innerHeight;
   camera.updateProjectionMatrix();
