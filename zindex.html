@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Portal Police Game</title>
+<title>Portal Laser Game</title>
 <style>
   body { margin:0; overflow:hidden; }
 </style>
@@ -26,7 +26,6 @@ pitch.add(camera);
 const yaw = new THREE.Object3D();
 yaw.position.set(0,2,0);
 yaw.add(pitch);
-
 scene.add(yaw);
 
 // ===== RENDERER =====
@@ -68,13 +67,11 @@ let keys={};
 
 addEventListener("keydown",e=>{
   keys[e.key.toLowerCase()]=true;
-
   if(e.code==="Space" && onGround){
     velocityY = jumpPower;
     onGround = false;
   }
 });
-
 addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
 
 document.body.onclick=()=>document.body.requestPointerLock();
@@ -89,11 +86,11 @@ addEventListener("mousemove",e=>{
 });
 
 // ===== PHYSICS =====
-let velocityY = 0;
-let onGround = true;
-const gravity = -0.015;
-const jumpPower = 0.35;
-const groundHeight = 2;
+let velocityY=0;
+let onGround=true;
+const gravity=-0.015;
+const jumpPower=0.35;
+const groundHeight=2;
 
 // ===== COLLISION =====
 function canMove(x,z){
@@ -105,6 +102,25 @@ function canMove(x,z){
   }
   return true;
 }
+
+// ===== RAYCASTER (LASER) =====
+const raycaster = new THREE.Raycaster();
+
+// laser line
+const laserMat = new THREE.LineBasicMaterial({color:0xff0000});
+const laserGeom = new THREE.BufferGeometry().setFromPoints([
+  new THREE.Vector3(),
+  new THREE.Vector3()
+]);
+const laser = new THREE.Line(laserGeom, laserMat);
+scene.add(laser);
+
+// preview point
+const preview = new THREE.Mesh(
+  new THREE.SphereGeometry(0.3,16,16),
+  new THREE.MeshBasicMaterial({color:0xffff00})
+);
+scene.add(preview);
 
 // ===== PORTALS =====
 let portalA=null, portalB=null, clickCount=0;
@@ -118,24 +134,20 @@ function makePortal(color){
   return p;
 }
 
+let lastHit = null;
+
+// ===== SHOOT =====
 addEventListener("mousedown",e=>{
-  if(e.button!==0) return;
-
-  let dir=new THREE.Vector3();
-  camera.getWorldDirection(dir);
-
-  let px=yaw.position.x+dir.x*10;
-  let py=yaw.position.y+dir.y*10;
-  let pz=yaw.position.z+dir.z*10;
+  if(e.button!==0 || !lastHit) return;
 
   clickCount++;
 
   if(clickCount%2){
     if(!portalA) portalA=makePortal(0x0000ff);
-    portalA.position.set(px,py,pz);
+    portalA.position.copy(lastHit.point);
   }else{
     if(!portalB) portalB=makePortal(0xff8800);
-    portalB.position.set(px,py,pz);
+    portalB.position.copy(lastHit.point);
   }
 });
 
@@ -163,12 +175,11 @@ function exitPortal(portal){
   camera.getWorldDirection(dir);
 
   yaw.position.copy(portal.position);
+  yaw.position.x += dir.x*4;
+  yaw.position.z += dir.z*4;
 
-  yaw.position.x += dir.x * 4;
-  yaw.position.z += dir.z * 4;
-
-  velocityY = 0;
-  cooldown = 25;
+  velocityY=0;
+  cooldown=20;
 }
 
 // ===== GUN =====
@@ -179,54 +190,30 @@ const gun=new THREE.Mesh(
 camera.add(gun);
 gun.position.set(0.6,-0.5,-1.2);
 
-// ===== POLICE =====
-const police=[];
-
-for(let i=0;i<5;i++){
-  let p=new THREE.Mesh(
-    new THREE.BoxGeometry(1,2,1),
-    new THREE.MeshLambertMaterial({color:0xff0000})
-  );
-
-  p.position.set((Math.random()-0.5)*100,1,(Math.random()-0.5)*100);
-  scene.add(p);
-
-  police.push({mesh:p,speed:0.05});
-}
-
-function policeCanMove(x,z){
-  for(let b of buildings){
-    if(Math.abs(x - b.position.x) < 3 &&
-       Math.abs(z - b.position.z) < 3){
-      return false;
-    }
-  }
-  return true;
-}
-
-function policeTeleport(p){
-  if(!portalA||!portalB) return;
-
-  let pos=p.mesh.position;
-
-  let dA=Math.hypot(pos.x-portalA.position.x,pos.z-portalA.position.z);
-  let dB=Math.hypot(pos.x-portalB.position.x,pos.z-portalB.position.z);
-
-  if(dA<2){
-    p.mesh.position.copy(portalB.position);
-  }
-  else if(dB<2){
-    p.mesh.position.copy(portalA.position);
-  }
-}
-
 // ===== LOOP =====
 function animate(){
   requestAnimationFrame(animate);
 
   if(cooldown>0) cooldown--;
 
-  // movement
+  // ===== LASER UPDATE =====
+  raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
+
+  const objects = [ground, ...buildings];
+  const hits = raycaster.intersectObjects(objects);
+
+  if(hits.length > 0){
+    lastHit = hits[0];
+
+    laser.geometry.setFromPoints([
+      camera.position,
+      hits[0].point
+    ]);
+
+    preview.position.copy(hits[0].point);
+  }
+
+  // ===== MOVEMENT =====
   let forward=new THREE.Vector3(0,0,-1).applyQuaternion(yaw.quaternion);
   forward.y=0;
   forward.normalize();
@@ -238,50 +225,27 @@ function animate(){
   let nz=yaw.position.z;
   let speed=0.2;
 
-  if(keys["w"]){ nx += forward.x*speed; nz += forward.z*speed; }
-  if(keys["s"]){ nx -= forward.x*speed; nz -= forward.z*speed; }
-  if(keys["a"]){ nx -= right.x*speed; nz -= right.z*speed; }
-  if(keys["d"]){ nx += right.x*speed; nz += right.z*speed; }
+  if(keys["w"]){ nx+=forward.x*speed; nz+=forward.z*speed; }
+  if(keys["s"]){ nx-=forward.x*speed; nz-=forward.z*speed; }
+  if(keys["a"]){ nx-=right.x*speed; nz-=right.z*speed; }
+  if(keys["d"]){ nx+=right.x*speed; nz+=right.z*speed; }
 
   if(canMove(nx,nz)){
-    yaw.position.x = nx;
-    yaw.position.z = nz;
+    yaw.position.x=nx;
+    yaw.position.z=nz;
   }
 
   // gravity
-  velocityY += gravity;
-  yaw.position.y += velocityY;
+  velocityY+=gravity;
+  yaw.position.y+=velocityY;
 
-  if(yaw.position.y <= groundHeight){
-    yaw.position.y = groundHeight;
-    velocityY = 0;
-    onGround = true;
+  if(yaw.position.y<=groundHeight){
+    yaw.position.y=groundHeight;
+    velocityY=0;
+    onGround=true;
   }
 
   teleport();
-
-  // ===== POLICE AI =====
-  for(let p of police){
-    let dx = yaw.position.x - p.mesh.position.x;
-    let dz = yaw.position.z - p.mesh.position.z;
-
-    let dist = Math.hypot(dx,dz);
-
-    if(dist > 0){
-      dx /= dist;
-      dz /= dist;
-    }
-
-    let nx = p.mesh.position.x + dx * p.speed;
-    let nz = p.mesh.position.z + dz * p.speed;
-
-    if(policeCanMove(nx,nz)){
-      p.mesh.position.x = nx;
-      p.mesh.position.z = nz;
-    }
-
-    policeTeleport(p);
-  }
 
   renderer.render(scene,camera);
 }
