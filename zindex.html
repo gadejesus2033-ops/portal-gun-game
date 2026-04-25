@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Portal FPS (With Jump + Fixes)</title>
+<title>Portal FPS WORKING</title>
 <style>
   body { margin:0; overflow:hidden; }
 </style>
@@ -50,7 +50,7 @@ scene.add(ground);
 
 // ===== BUILDINGS =====
 const buildings=[];
-for(let i=0;i<60;i++){
+for(let i=0;i<40;i++){
   let h=Math.random()*8+4;
 
   let b=new THREE.Mesh(
@@ -58,14 +58,24 @@ for(let i=0;i<60;i++){
     new THREE.MeshLambertMaterial({color:0x888888})
   );
 
-  b.position.set((Math.random()-0.5)*150,h/2,(Math.random()-0.5)*150);
+  b.position.set((Math.random()-0.5)*120,h/2,(Math.random()-0.5)*120);
   scene.add(b);
   buildings.push(b);
 }
 
 // ===== INPUT =====
 let keys={};
-addEventListener("keydown",e=>keys[e.key.toLowerCase()]=true);
+
+addEventListener("keydown",e=>{
+  keys[e.key.toLowerCase()]=true;
+
+  // JUMP TRIGGER (event-based = reliable)
+  if(e.code === "Space" && onGround){
+    velocityY = jumpPower;
+    onGround = false;
+  }
+});
+
 addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
 
 document.body.onclick=()=>document.body.requestPointerLock();
@@ -79,11 +89,11 @@ addEventListener("mousemove",e=>{
   }
 });
 
-// ===== PLAYER PHYSICS =====
+// ===== PHYSICS =====
 let velocityY = 0;
 let onGround = true;
-const gravity = -0.01;
-const jumpPower = 0.25;
+const gravity = -0.015;
+const jumpPower = 0.35;
 const groundHeight = 2;
 
 // ===== COLLISION =====
@@ -130,7 +140,7 @@ addEventListener("mousedown",e=>{
   }
 });
 
-// ===== TELEPORT =====
+// ===== TELEPORT (STABLE) =====
 let cooldown=0;
 
 function teleport(){
@@ -154,12 +164,13 @@ function exitPortal(portal){
   camera.getWorldDirection(dir);
 
   yaw.position.copy(portal.position);
-  yaw.position.add(dir.multiplyScalar(3)); // push OUT
 
-  yaw.position.y = groundHeight;
+  // PUSH OUT PROPERLY
+  yaw.position.x += dir.x * 4;
+  yaw.position.z += dir.z * 4;
+
   velocityY = 0;
-
-  cooldown = 20;
+  cooldown = 25;
 }
 
 // ===== GUN =====
@@ -168,7 +179,7 @@ const gun=new THREE.Mesh(
   new THREE.MeshBasicMaterial({color:0xffffff})
 );
 camera.add(gun);
-gun.position.set(0.5,-0.5,-1.5);
+gun.position.set(0.6,-0.5,-1.2);
 
 // ===== LOOP =====
 function animate(){
@@ -177,18 +188,15 @@ function animate(){
   if(cooldown>0) cooldown--;
 
   // forward
-  let forward=new THREE.Vector3(0,0,-1);
-  forward.applyQuaternion(yaw.quaternion);
+  let forward=new THREE.Vector3(0,0,-1).applyQuaternion(yaw.quaternion);
   forward.y=0;
   forward.normalize();
 
-  let right=new THREE.Vector3(1,0,0);
-  right.applyQuaternion(yaw.quaternion);
+  let right=new THREE.Vector3(1,0,0).applyQuaternion(yaw.quaternion);
   right.normalize();
 
   let nx=yaw.position.x;
   let nz=yaw.position.z;
-
   let speed=0.2;
 
   if(keys["w"]){ nx += forward.x*speed; nz += forward.z*speed; }
@@ -197,16 +205,11 @@ function animate(){
   if(keys["d"]){ nx += right.x*speed; nz += right.z*speed; }
 
   if(canMove(nx,nz)){
-    yaw.position.x=nx;
-    yaw.position.z=nz;
+    yaw.position.x = nx;
+    yaw.position.z = nz;
   }
 
-  // ===== JUMP =====
-  if(keys[" "] && onGround){
-    velocityY = jumpPower;
-    onGround = false;
-  }
-
+  // ===== GRAVITY (ALWAYS RUNS) =====
   velocityY += gravity;
   yaw.position.y += velocityY;
 
