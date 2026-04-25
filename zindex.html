@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Portal FPS FINAL</title>
+<title>Portal FPS FIXED</title>
 <style>
   body { margin:0; overflow:hidden; }
 </style>
@@ -20,14 +20,14 @@ scene.background = new THREE.Color(0x87ceeb);
 const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
 
 // ===== FPS CAMERA =====
-const pitchObject = new THREE.Object3D();
-pitchObject.add(camera);
+const pitch = new THREE.Object3D();
+pitch.add(camera);
 
-const yawObject = new THREE.Object3D();
-yawObject.position.set(0, 2, 0);
-yawObject.add(pitchObject);
+const yaw = new THREE.Object3D();
+yaw.position.set(0,2,0);
+yaw.add(pitch);
 
-scene.add(yawObject);
+scene.add(yaw);
 
 // ===== RENDERER =====
 const renderer = new THREE.WebGLRenderer({antialias:true});
@@ -35,8 +35,8 @@ renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 
 // ===== LIGHT =====
-scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-const light = new THREE.DirectionalLight(0xffffff, 1);
+scene.add(new THREE.AmbientLight(0xffffff,0.6));
+const light = new THREE.DirectionalLight(0xffffff,1);
 light.position.set(10,20,10);
 scene.add(light);
 
@@ -48,56 +48,47 @@ const ground = new THREE.Mesh(
 ground.rotation.x = -Math.PI/2;
 scene.add(ground);
 
-// ===== BUILDINGS + COLLISION DATA =====
+// ===== BUILDINGS =====
 const buildings=[];
-
 for(let i=0;i<80;i++){
-  let h = Math.random()*10 + 5;
+  let h=Math.random()*10+5;
 
-  let b = new THREE.Mesh(
+  let b=new THREE.Mesh(
     new THREE.BoxGeometry(4,h,4),
     new THREE.MeshLambertMaterial({color:0x888888})
   );
 
-  b.position.set(
-    (Math.random()-0.5)*200,
-    h/2,
-    (Math.random()-0.5)*200
-  );
-
+  b.position.set((Math.random()-0.5)*200,h/2,(Math.random()-0.5)*200);
   scene.add(b);
 
-  buildings.push({
-    mesh:b,
-    size:2 // half width
-  });
+  buildings.push({mesh:b,size:2});
 }
 
 // ===== CONTROLS =====
 let keys={};
 
-addEventListener("keydown", e=>keys[e.key.toLowerCase()]=true);
-addEventListener("keyup", e=>keys[e.key.toLowerCase()]=false);
+addEventListener("keydown",e=>keys[e.key.toLowerCase()]=true);
+addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
 
-document.body.onclick = ()=>document.body.requestPointerLock();
+document.body.onclick=()=>document.body.requestPointerLock();
 
 // ===== MOUSE LOOK =====
-addEventListener("mousemove", e=>{
+addEventListener("mousemove",e=>{
   if(document.pointerLockElement){
-    yawObject.rotation.y -= e.movementX * 0.002;
-    pitchObject.rotation.x -= e.movementY * 0.002;
+    yaw.rotation.y -= e.movementX*0.002;
+    pitch.rotation.x -= e.movementY*0.002;
 
-    pitchObject.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitchObject.rotation.x));
+    pitch.rotation.x=Math.max(-Math.PI/2,Math.min(Math.PI/2,pitch.rotation.x));
   }
 });
 
-// ===== COLLISION FUNCTION =====
-function canMove(newPos){
+// ===== COLLISION =====
+function canMove(pos){
   for(let b of buildings){
-    let dx = newPos.x - b.mesh.position.x;
-    let dz = newPos.z - b.mesh.position.z;
+    let dx=pos.x-b.mesh.position.x;
+    let dz=pos.z-b.mesh.position.z;
 
-    if(Math.abs(dx) < b.size + 1 && Math.abs(dz) < b.size + 1){
+    if(Math.abs(dx)<3 && Math.abs(dz)<3){
       return false;
     }
   }
@@ -110,7 +101,7 @@ let portalB=null;
 let clickCount=0;
 
 function makePortal(color){
-  let p = new THREE.Mesh(
+  let p=new THREE.Mesh(
     new THREE.TorusGeometry(1,0.3,16,100),
     new THREE.MeshBasicMaterial({color})
   );
@@ -118,50 +109,54 @@ function makePortal(color){
   return p;
 }
 
-addEventListener("mousedown", e=>{
+addEventListener("mousedown",e=>{
   if(e.button!==0) return;
 
-  const dir = new THREE.Vector3();
+  let dir=new THREE.Vector3();
   camera.getWorldDirection(dir);
 
-  const pos = yawObject.position.clone();
+  let pos=yaw.position;
 
-  const px = pos.x + dir.x * 10;
-  const py = pos.y + dir.y * 10;
-  const pz = pos.z + dir.z * 10;
+  let px=pos.x+dir.x*10;
+  let py=pos.y+dir.y*10;
+  let pz=pos.z+dir.z*10;
 
   clickCount++;
 
-  if(clickCount % 2 === 1){
-    if(!portalA) portalA = makePortal(0x0000ff);
+  if(clickCount%2){
+    if(!portalA) portalA=makePortal(0x0000ff);
     portalA.position.set(px,py,pz);
-  } else {
-    if(!portalB) portalB = makePortal(0xff8800);
+  }else{
+    if(!portalB) portalB=makePortal(0xff8800);
     portalB.position.set(px,py,pz);
   }
 });
 
-// ===== GUN =====
-const gun = new THREE.Mesh(
+// ===== GUN (FIXED) =====
+const gun=new THREE.Mesh(
   new THREE.BoxGeometry(0.3,0.3,1),
   new THREE.MeshBasicMaterial({color:0xffffff})
 );
 scene.add(gun);
 
-// ===== TELEPORT =====
+// ===== TELEPORT FIX =====
+let cooldown=0;
+
 function teleport(){
-  if(!portalA || !portalB) return;
+  if(!portalA||!portalB||cooldown>0) return;
 
-  let pos = yawObject.position;
+  let pos=yaw.position;
 
-  let dA = Math.hypot(pos.x-portalA.position.x, pos.z-portalA.position.z);
-  let dB = Math.hypot(pos.x-portalB.position.x, pos.z-portalB.position.z);
+  let dA=Math.hypot(pos.x-portalA.position.x,pos.z-portalA.position.z);
+  let dB=Math.hypot(pos.x-portalB.position.x,pos.z-portalB.position.z);
 
-  if(dA < 2){
-    yawObject.position.copy(portalB.position);
+  if(dA<2){
+    yaw.position.copy(portalB.position);
+    cooldown=20;
   }
-  else if(dB < 2){
-    yawObject.position.copy(portalA.position);
+  else if(dB<2){
+    yaw.position.copy(portalA.position);
+    cooldown=20;
   }
 }
 
@@ -169,54 +164,55 @@ function teleport(){
 function animate(){
   requestAnimationFrame(animate);
 
-  const forward = new THREE.Vector3();
-  yawObject.getWorldDirection(forward);
-  forward.y = 0;
+  if(cooldown>0) cooldown--;
+
+  // CORRECT FORWARD
+  let forward=new THREE.Vector3();
+  yaw.getWorldDirection(forward);
+  forward.y=0;
   forward.normalize();
 
-  const right = new THREE.Vector3();
-  right.crossVectors(forward, new THREE.Vector3(0,1,0)).normalize();
+  let right=new THREE.Vector3();
+  right.crossVectors(forward,new THREE.Vector3(0,1,0)).normalize();
 
-  let speed = 0.2;
+  let speed=0.2;
+  let newPos=yaw.position.clone();
 
-  let newPos = yawObject.position.clone();
-
-  if(keys["w"]) newPos.add(forward.clone().multiplyScalar(speed));
-  if(keys["s"]) newPos.add(forward.clone().multiplyScalar(-speed));
+  // FIX: invert movement (THIS WAS THE BUG)
+  if(keys["w"]) newPos.add(forward.clone().multiplyScalar(-speed));
+  if(keys["s"]) newPos.add(forward.clone().multiplyScalar(speed));
   if(keys["a"]) newPos.add(right.clone().multiplyScalar(-speed));
   if(keys["d"]) newPos.add(right.clone().multiplyScalar(speed));
 
-  // APPLY COLLISION
   if(canMove(newPos)){
-    yawObject.position.copy(newPos);
+    yaw.position.copy(newPos);
   }
 
   teleport();
 
-  // ===== GUN =====
-  const dir = new THREE.Vector3();
+  // ===== GUN FIX =====
+  let dir=new THREE.Vector3();
   camera.getWorldDirection(dir);
 
-  const rightVec = new THREE.Vector3();
-  rightVec.crossVectors(dir, new THREE.Vector3(0,1,0)).normalize();
+  let rightVec=new THREE.Vector3();
+  rightVec.crossVectors(dir,new THREE.Vector3(0,1,0)).normalize();
 
   gun.position.copy(camera.position);
-  gun.position.add(dir.clone().multiplyScalar(0.8));
-  gun.position.add(rightVec.clone().multiplyScalar(0.4));
-  gun.position.y -= 0.5;
+  gun.position.add(dir.clone().multiplyScalar(0.6));
+  gun.position.add(rightVec.clone().multiplyScalar(0.3));
+  gun.position.y-=0.4;
 
   gun.rotation.copy(camera.rotation);
 
-  renderer.render(scene, camera);
+  renderer.render(scene,camera);
 }
 
 animate();
 
-// resize
-addEventListener("resize", ()=>{
-  camera.aspect = innerWidth/innerHeight;
+addEventListener("resize",()=>{
+  camera.aspect=innerWidth/innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
+  renderer.setSize(innerWidth,innerHeight);
 });
 </script>
 
