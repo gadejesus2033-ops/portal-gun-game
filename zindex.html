@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Portal FPS WORKING</title>
+<title>Portal Police Game</title>
 <style>
   body { margin:0; overflow:hidden; }
 </style>
@@ -69,8 +69,7 @@ let keys={};
 addEventListener("keydown",e=>{
   keys[e.key.toLowerCase()]=true;
 
-  // JUMP TRIGGER (event-based = reliable)
-  if(e.code === "Space" && onGround){
+  if(e.code==="Space" && onGround){
     velocityY = jumpPower;
     onGround = false;
   }
@@ -140,7 +139,7 @@ addEventListener("mousedown",e=>{
   }
 });
 
-// ===== TELEPORT (STABLE) =====
+// ===== TELEPORT =====
 let cooldown=0;
 
 function teleport(){
@@ -165,7 +164,6 @@ function exitPortal(portal){
 
   yaw.position.copy(portal.position);
 
-  // PUSH OUT PROPERLY
   yaw.position.x += dir.x * 4;
   yaw.position.z += dir.z * 4;
 
@@ -181,13 +179,54 @@ const gun=new THREE.Mesh(
 camera.add(gun);
 gun.position.set(0.6,-0.5,-1.2);
 
+// ===== POLICE =====
+const police=[];
+
+for(let i=0;i<5;i++){
+  let p=new THREE.Mesh(
+    new THREE.BoxGeometry(1,2,1),
+    new THREE.MeshLambertMaterial({color:0xff0000})
+  );
+
+  p.position.set((Math.random()-0.5)*100,1,(Math.random()-0.5)*100);
+  scene.add(p);
+
+  police.push({mesh:p,speed:0.05});
+}
+
+function policeCanMove(x,z){
+  for(let b of buildings){
+    if(Math.abs(x - b.position.x) < 3 &&
+       Math.abs(z - b.position.z) < 3){
+      return false;
+    }
+  }
+  return true;
+}
+
+function policeTeleport(p){
+  if(!portalA||!portalB) return;
+
+  let pos=p.mesh.position;
+
+  let dA=Math.hypot(pos.x-portalA.position.x,pos.z-portalA.position.z);
+  let dB=Math.hypot(pos.x-portalB.position.x,pos.z-portalB.position.z);
+
+  if(dA<2){
+    p.mesh.position.copy(portalB.position);
+  }
+  else if(dB<2){
+    p.mesh.position.copy(portalA.position);
+  }
+}
+
 // ===== LOOP =====
 function animate(){
   requestAnimationFrame(animate);
 
   if(cooldown>0) cooldown--;
 
-  // forward
+  // movement
   let forward=new THREE.Vector3(0,0,-1).applyQuaternion(yaw.quaternion);
   forward.y=0;
   forward.normalize();
@@ -209,7 +248,7 @@ function animate(){
     yaw.position.z = nz;
   }
 
-  // ===== GRAVITY (ALWAYS RUNS) =====
+  // gravity
   velocityY += gravity;
   yaw.position.y += velocityY;
 
@@ -220,6 +259,29 @@ function animate(){
   }
 
   teleport();
+
+  // ===== POLICE AI =====
+  for(let p of police){
+    let dx = yaw.position.x - p.mesh.position.x;
+    let dz = yaw.position.z - p.mesh.position.z;
+
+    let dist = Math.hypot(dx,dz);
+
+    if(dist > 0){
+      dx /= dist;
+      dz /= dist;
+    }
+
+    let nx = p.mesh.position.x + dx * p.speed;
+    let nz = p.mesh.position.z + dz * p.speed;
+
+    if(policeCanMove(nx,nz)){
+      p.mesh.position.x = nx;
+      p.mesh.position.z = nz;
+    }
+
+    policeTeleport(p);
+  }
 
   renderer.render(scene,camera);
 }
